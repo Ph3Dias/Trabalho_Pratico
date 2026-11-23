@@ -1,165 +1,166 @@
 from collections import deque
-import math
 import random
+import polars as pl
 
 
-def _extrair_adjacencia_nao_direcionada(grafo) -> dict[str, set[str]]:
+def carregar_adjacencia_csv(
+    caminho_csv: str = "Output/Parte1/maior_cfc_arestas.csv",
+    separador: str = "\t",
+) -> tuple[list[str], dict[str, set[str]]]:
+    df = (
+        pl.read_csv(
+            caminho_csv,
+            has_header=True,
+            separator=separador,
+            schema_overrides={"src": pl.String, "dst": pl.String},
+        )
+        .select("src", "dst")
+        .drop_nulls()
+        .unique()
+    )
+
+    nos_set: set[str] = set()
     adj: dict[str, set[str]] = {}
-    itens = grafo.values() if hasattr(grafo, "values") else grafo.items()
 
-    nos_ids = set()
-    bruto: dict[str, list[str]] = {}
+    for src, dst in df.iter_rows():
+        nos_set.add(src)
+        nos_set.add(dst)
+        adj.setdefault(src, set()).add(dst)
+        adj.setdefault(dst, set())
 
-    for item in itens:
-        if hasattr(item, "getId") and hasattr(item, "getAdj"):
-            u_id = item.getId()
-            vizinhos = list(item.getAdj())
-        else:
-            u_id, vizinhos = item
-        nos_ids.add(u_id)
-        bruto[u_id] = vizinhos
-
-    for u_id in nos_ids:
-        adj[u_id] = set()
-
-    for u_id, vizinhos in bruto.items():
-        for v_id in vizinhos:
-            if v_id in nos_ids and v_id != u_id:
-                adj[u_id].add(v_id)
-                adj[v_id].add(u_id)
-
-    return adj
+    nos = sorted(nos_set)
+    for v in nos:
+        adj.setdefault(v, set())
+    return nos, adj
 
 
-def calcular_clustering_medio(adj: dict[str, set[str]], amostra_nos: int | None = None, seed: int = 42) -> float:
-
-    nos = list(adj.keys())
+def clusterizacao_media_manual(nos: list[str], adj: dict[str, set[str]]) -> float:
+    """Coeficiente de clusterização local médio sobre a vizinhança não direcionada
+    induzida (útil para comparação rápida sem biblioteca pronta).
+    """
     if not nos:
         return 0.0
 
-    if amostra_nos is not None and amostra_nos < len(nos):
-        rng = random.Random(seed)
-        nos = rng.sample(nos, amostra_nos)
+    nao_dir: dict[str, set[str]] = {v: set() for v in nos}
+    for u, vizs in adj.items():
+        for v in vizs:
+            if u != v:
+                nao_dir[u].add(v)
+                nao_dir[v].add(u)
 
     soma_c = 0.0
-    contados = 0
-
-    for u in nos:
-        viz = list(adj[u])
+    for v in nos:
+        viz = list(nao_dir[v])
         k = len(viz)
         if k < 2:
-            soma_c += 0.0
-            contados += 1
             continue
-
-        ligacoes_entre_vizinhos = 0
+        ligacoes = 0
         for i in range(k):
-            vi = viz[i]
-            adj_vi = adj[vi]
+            u = viz[i]
             for j in range(i + 1, k):
-                if viz[j] in adj_vi:
-                    ligacoes_entre_vizinhos += 1
+                if viz[j] in nao_dir[u]:
+                    ligacoes += 1
+        soma_c += (2.0 * ligacoes) / (k * (k - 1))
 
-        max_ligacoes = k * (k - 1) / 2
-        soma_c += ligacoes_entre_vizinhos / max_ligacoes
-        contados += 1
-
-    return soma_c / contados if contados > 0 else 0.0
+    return soma_c / len(nos)
 
 
-def calcular_caminho_medio_bfs(adj: dict[str, set[str]], amostra_origens: int | None = 200, seed: int = 42) -> float:
-
-    nos = list(adj.keys())
+def caminho_medio_bfs_manual(
+    nos: list[str],
+    adj: dict[str, set[str]],
+    amostra_origens: int | None = None,
+    seed: int = 42,
+) -> float | None:
+    """Calcula a distância média dos caminhos mais curtos (BFS).
+    Se `amostra_origens` for definido, aproxima por amostragem de fontes.
+    """
     n = len(nos)
-    if n < 2:
+    if n <= 1:
         return 0.0
 
+    origens = nos
     if amostra_origens is not None and amostra_origens < n:
         rng = random.Random(seed)
         origens = rng.sample(nos, amostra_origens)
-    else:
-        origens = nos
 
     soma_distancias = 0
-    total_pares = 0
+    total_pares_alcancaveis = 0
 
     for origem in origens:
-        distancias = {origem: 0}
-        fila = deque([origem])
-
+        dist: dict[str, int] = {origem: 0}
+        fila: deque[str] = deque([origem])
         while fila:
             atual = fila.popleft()
-            d_atual = distancias[atual]
-            for viz in adj[atual]:
-                if viz not in distancias:
-                    distancias[viz] = d_atual + 1
-                    fila.append(viz)
+            d_atual = dist[atual]
+            for prox in adj[atual]:
+                if prox not in dist:
+                    dist[prox] = d_atual + 1
+                    fila.append(prox)
 
-        for destino, dist in distancias.items():
+        for destino, d in dist.items():
             if destino != origem:
-                soma_distancias += dist
-                total_pares += 1
+                soma_distancias += d
+                total_pares_alcancaveis += 1
 
-    return soma_distancias / total_pares if total_pares > 0 else 0.0
+    if total_pares_alcancaveis == 0:
+        return None
+    return soma_distancias / total_pares_alcancaveis
 
 
-def calcular_small_world(
-    grafo,
-    amostra_clustering: int | None = 5000,
-    amostra_bfs: int | None = 200,
+def avaliar_small_world_manual(
+    caminho_csv: str = "Output/Parte1/maior_cfc_arestas.csv",
+    amostra_origens: int | None = 500,
+    num_aleatorios: int = 3,
     seed: int = 42,
-) -> dict[str, float | int | bool]:
+) -> dict:
+    nos, adj = carregar_adjacencia_csv(caminho_csv)
+    n = len(nos)
+    arestas_dir = [(u, v) for u, vizs in adj.items() for v in vizs]
+    m = len(arestas_dir)
 
-    adj = _extrair_adjacencia_nao_direcionada(grafo)
-    n = len(adj)
-    if n < 2:
-        return {
-            "N": n,
-            "grau_medio": 0.0,
-            "C": 0.0,
-            "L": 0.0,
-            "C_rand": 0.0,
-            "L_rand": 0.0,
-            "sigma": 0.0,
-            "indicio_small_world": False,
-        }
+    c_real = clusterizacao_media_manual(nos, adj)
+    l_real = caminho_medio_bfs_manual(nos, adj, amostra_origens=amostra_origens, seed=seed)
 
-    grau_medio = sum(len(viz) for viz in adj.values()) / n
-    c_real = calcular_clustering_medio(adj, amostra_nos=amostra_clustering, seed=seed)
-    l_real = calcular_caminho_medio_bfs(adj, amostra_origens=amostra_bfs, seed=seed)
+    rng = random.Random(seed)
+    c_rand_list: list[float] = []
+    l_rand_list: list[float] = []
 
-    c_rand = (grau_medio / n) if n > 0 else 0.0
-    l_rand = (math.log(n) / math.log(grau_medio)) if grau_medio > 1 else 0.0
+    for _ in range(num_aleatorios):
+        adj_rand: dict[str, set[str]] = {v: set() for v in nos}
+        adicionadas = 0
+        tentativas = 0
+        max_tentativas = max(m * 10, 100)
+        while adicionadas < m and tentativas < max_tentativas:
+            u = rng.choice(nos)
+            v = rng.choice(nos)
+            tentativas += 1
+            if u != v and v not in adj_rand[u]:
+                adj_rand[u].add(v)
+                adicionadas += 1
 
-    if c_rand > 0 and l_rand > 0 and l_real > 0:
+        c_rand_list.append(clusterizacao_media_manual(nos, adj_rand))
+        l_rand = caminho_medio_bfs_manual(nos, adj_rand, amostra_origens=amostra_origens, seed=seed)
+        if l_rand is not None:
+            l_rand_list.append(l_rand)
+
+    c_rand = sum(c_rand_list) / len(c_rand_list) if c_rand_list else 0.0
+    l_rand = sum(l_rand_list) / len(l_rand_list) if l_rand_list else None
+
+    sigma = None
+    if l_real and l_rand and c_rand > 0:
         sigma = (c_real / c_rand) / (l_real / l_rand)
-    else:
-        sigma = 0.0
-
-    indicio = (c_real > c_rand) and (sigma > 1.0)
 
     return {
-        "N": n,
-        "grau_medio": grau_medio,
-        "C": c_real,
-        "L": l_real,
-        "C_rand": c_rand,
-        "L_rand": l_rand,
-        "sigma": sigma,
-        "indicio_small_world": indicio,
+        "n_vertices": n,
+        "n_arestas": m,
+        "C_real": c_real,
+        "L_real": l_real,
+        "C_aleatorio_medio": c_rand,
+        "L_aleatorio_medio": l_rand,
+        "sigma_small_world": sigma,
+        "indicio_small_world": bool(sigma is not None and sigma > 1.0 and c_real > c_rand),
     }
 
 
 if __name__ == "__main__":
-
-    grafo_exemplo = {
-        "A": ["B", "C", "D"],
-        "B": ["A", "C", "E"],
-        "C": ["A", "B", "D"],
-        "D": ["A", "C", "F"],
-        "E": ["B", "F"],
-        "F": ["D", "E"],
-    }
-    resultado = calcular_small_world(grafo_exemplo, amostra_clustering=None, amostra_bfs=None)
-    for chave, valor in resultado.items():
-        print(f"{chave}: {valor}")
+    print(avaliar_small_world_manual())

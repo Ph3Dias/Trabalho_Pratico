@@ -11,6 +11,7 @@ from Parte_2.no import *
 from Parte_2.tarjan import *
 from Parte_2.verificacao_eulerianidade import *
 from Parte_3 import *
+import time
 
 mostrar_menu= True
 while True:
@@ -111,17 +112,21 @@ while True:
             print(f"Diametro {diametro}\nRaio {raio}\nCaminho médio {caminho_medio}")
             print(f"Clusterização média {calcular_clusterizacao_media()}")
         case "2":
+
+
             caminho = "Output/Tratamento_de_entrada/arestas_ordenadas_estaticas.csv"
-            
+            t0 = time.time()
             mst_prim, custo_prim = prim_mst(caminho, None, no_raiz="2")
-            
+            tf = time.time()
             print()
             print("================================================")
-            print(f"Prim -> arestas na MST: {len(mst_prim)} | custo total: {custo_prim}")
-        
+            print(f"Prim -> arestas na MST: {len(mst_prim)} | custo total: {custo_prim} | Tempo de Execução {tf-t0}")
+            t0 = time.time()
+
             mst_kruskal, custo_kruskal = kruskal_mst(caminho, None)
+            tf = time.time()
             print()
-            print(f"Kruskal -> arestas na MST: {len(mst_kruskal)} | custo total: {custo_kruskal}")
+            print(f"Kruskal -> arestas na MST: {len(mst_kruskal)} | custo total: {custo_kruskal} | Tempo de Execução {tf-t0}s")
             print("================================================")
             print()
         case "3":
@@ -132,12 +137,14 @@ while True:
 
             raiz = input("Insira o id do vértice raíz: ")
             
-
+            t0 = time.time()
             ctrl, grafo =(bellman_ford_forcado("Output/Parte1/maior_cfc_arestas.csv", 10000, raiz))
+            tf = time.time()
             if ctrl:
                 print("Grafo sem ciclos negativos")
             else:
                 print("Grafo com ciclos negativos")
+            print(f"Tempo de Execução {tf-t0} s")
         case "4":
             print(
                 "A raíz e o vértice alvo devem pertencer ao grafo, consulte antes o arquivo"+
@@ -145,12 +152,15 @@ while True:
                 )
             
             raiz = input("Insira o id do vértice raíz: ")
-
+            t0 = time.time()
             arvore = busca_em_largura(
                 "Output/Tratamento_de_entrada/arestas_ordenadas_estaticas.csv",
                 None,
                 raiz,
                 None)
+            tf = time.time()
+
+            print(f"Tempo de Execução {tf-t0} s")
         case "5":
             print(
                 "A raíz e o vértice alvo devem pertencer ao grafo, consulte antes o arquivo"+
@@ -158,31 +168,41 @@ while True:
                 )
 
             raiz = input("Insira o id do vértice raíz: ")
-            
+
+            t0 = time.time()
             grafo = busca_em_profundidade_iterativa(
                 "Output/Tratamento_de_entrada/arestas_ordenadas_estaticas.csv",
                 None)
-            
+            tf = time.time()
+            print(f"Tempo de Execução {tf-t0} s")
         case "6":
             raiz = input("Insira o ID do vértice raíz: ")
+            t0 = time.time()
             grafo = dijkstra_forcado(
                 "Output/Tratamento_de_entrada/arestas_ordenadas_estaticas.csv",
                 None,
                 raiz)
+            tf = time.time()
+            print(f"Tempo de Execução {tf-t0} s")
         case "7":
             qtd_arestas = int(input("Insira a quantidade de arestas (para usar todas, insira -1): "))
             if qtd_arestas == -1:
                 qtd_arestas = None
+            t0 = time.time()
             ids, matriz = floyd_warshall_forcado(
                 "Output/Parte1/maior_cfc_arestas.csv",
                 qtd_arestas)
+            tf = time.time()
+            print(f"Tempo de Execução {tf-t0} s")
         case "8":
+            t0 = time.time()
             cfcs, grafo = tarjan_com_dfs(
                     "Output/Tratamento_de_entrada/arestas_ordenadas_estaticas.csv",
                     None
                 )
+            tf = time.time()
             print(f"Total de CFCs: {len(cfcs)}")
+            print(f"Tempo de Execução {tf-t0} s")
+
     
-
-
     print("Para reexibir o menu, insira h")

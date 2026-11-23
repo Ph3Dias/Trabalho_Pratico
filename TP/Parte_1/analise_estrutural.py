@@ -3,6 +3,7 @@ import csv
 import matplotlib.pyplot as plt
 import networkx as nx
 import igraph as ig
+import time
 
 def calcular_grau_por_vertice(caminho_entrada, separador_entrada, caminho_saida, separador_saida):
 
@@ -364,8 +365,11 @@ def calcular_clusterizacao_media(
     if grafo.number_of_nodes() == 0:
         return None
 
-    return nx.average_clustering(grafo)
+    return  
 
 
 if __name__ == "__main__":
-    print(calcular_clusterizacao_media())
+
+    t0 = time.time()
+    diametro, raio, comprimento_medio = calcular_diametro_raio_caminho_medio()
+    print(time.time()-t0)

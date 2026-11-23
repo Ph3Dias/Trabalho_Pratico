@@ -24,7 +24,7 @@ def snap_temporal_para_snap_estatico(caminho_aresta, separador_entrada, caminho_
     )
 
 
-def contar_vertices(caminho_aresta, separador_entrada, caminho_saida, separador_saida,header_entrada=True):
+def contar_vertices(caminho_aresta, separador_entrada, caminho_saida, separador_saida, n_linhas,header_entrada=True):
 
     # Função meramente utilizada para confirmar a quantidade de vértices fornecidas no site
 
@@ -34,6 +34,7 @@ def contar_vertices(caminho_aresta, separador_entrada, caminho_saida, separador_
         comment_prefix="#",
         has_header=header_entrada,
         new_columns=["src", "dst"],
+        n_rows=n_linhas,
         schema_overrides={"src": pl.Int64, "dst": pl.Int64},
     )
 
@@ -54,18 +55,15 @@ def contar_vertices(caminho_aresta, separador_entrada, caminho_saida, separador_
     return df_vertices
 if __name__== '__main__':
 
-    snap_temporal_para_snap_estatico(
-        "Dataset/wiki-talk-temporal.txt",
-        ' ',
-        "Output/Tratamento_de_entrada/arestas_ordenadas_estaticas.csv",
-        '\t')
+
 
     df_vertices = contar_vertices(
         "Output/Tratamento_de_entrada/arestas_ordenadas_estaticas.csv",
         '\t',
         "Output/Tratamento_de_entrada/vertices_grafo_ordenado.csv",
-        '\t'
+        '\t', 10000
     )
 
+    print(len(df_vertices))
 
     
